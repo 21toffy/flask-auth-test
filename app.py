@@ -48,8 +48,10 @@ class Bucketlist(db.Model):
     
 
 
-    def __init__(self,name):
+    def __init__(self,name,checklist, user_id):
         self.name=name
+        self.checklist=checklist
+        self.user_id = user_id
 
 
 
@@ -79,6 +81,7 @@ def token_required(f):
 @app.route('/user', methods=['GET'])
 @token_required
 def get_all_users(current_user):
+
     if not current_user.admin:
         return jsonify({'message':'Can not perform function !'})
     users=User.query.all()
@@ -115,11 +118,11 @@ def get_one_users(current_user, public_id):
 
 #routes and view/logic enabling an admin and only an admin to create a user
 @app.route('/user', methods=['POST'])
-# @token_required
-def create_user():
+@token_required
+def create_user(current_user):
 
-    # if not current_user.admin:
-    #     return jsonify({'message':'Can not perform function !'})
+    if not current_user.admin:
+        return jsonify({'message':'Can not perform function !'})
 
     data = request.get_json()
 
@@ -127,7 +130,7 @@ def create_user():
     new_user =User(public_id=str(uuid.uuid4()), name=data['name'], password=hashed_password, admin=False)
     db.session.add(new_user)
     db.session.commit()
-    return jsonify({'message':'New user has been created!'})
+    return jsonify({'message':'New user'})
 
 
 
@@ -185,10 +188,12 @@ def login():
     return make_response('could not verify',401, {'WWW=Authenticate':'Basic realm="Logi reuired"'})
 
 
+
+
 @app.route('/bucket-list', methods=['GET'])
 @token_required
 def get_all_bucketlist(current_user):
-    bucketlists = Bucketlist.query.all()
+    bucketlists = Bucketlist.query.filter_by(user_id=current_user.id).all()
     print(current_user.id)
 
     output=[]
@@ -196,9 +201,9 @@ def get_all_bucketlist(current_user):
         bucketlist_data = {}
         bucketlist_data['id'] = bucketlist.id
         bucketlist_data['name']= bucketlist.name
-        # bucketlist_data['user_id']=user.id
+        bucketlist_data['checklist']=bucketlist.checklist
         bucketlist_data['date_created']=bucketlist.date_created
-        bucketlist_data['user_id']:bucketlist.user_id
+        # bucketlist_data['user_id']:bucketlist.user_id
         output.append(bucketlist_data)
 
     return jsonify({'bucket lists':output})
@@ -215,6 +220,8 @@ def get_one_bucketlist(current_user, bucketlist_id):
     bucketlist_data['id'] = bucketlist.id
     bucketlist_data['name']= bucketlist.name
     bucketlist_data['date_created']=bucketlist.date_created
+    bucketlist_data['checklist']=bucketlist.checklist
+
 
     return jsonify(bucketlist_data)
 
@@ -223,22 +230,31 @@ def get_one_bucketlist(current_user, bucketlist_id):
 @token_required
 def create_bucketlist(current_user):
     data = request.get_json()
-    new_bucketlist= Bucketlist(name=data['name'])
+    new_bucketlist= Bucketlist(name=data['name'], checklist=data['checklist'], user_id=current_user.id)
     db.session.add(new_bucketlist)
     db.session.commit()
     return jsonify({'msg':'bucket list created!'})
 
 
-@app.route('/bucket-list/<bucketlist_id>', methods=['PUT'])
-@token_required
-def comolete_bucketlist(current_user):
-    return ''
+# @app.route('/bucket-list/<bucketlist_id>', methods=['PUT'])
+# @token_required
+# def comolete_bucketlist(current_user):
+#     bucketlist = Bucketlist.query.filter_by(id=bucketlist_id, user_id=current_user.id).first()
+#     if not bucketlist:
+#         return jsonify({'msg':'no bucket list found!!'})
+#     return ''
 
 
 @app.route('/bucket-list/<bucketlist_id>', methods=['DELETE'])
 @token_required
-def delete_bucketlist(current_user):
-    return ''
+def delete_bucketlist(current_user, bucketlist_id):
+    bucketlist = Bucketlist.query.filter_by(id=bucketlist_id, user_id=current_user.id).first()
+    if not bucketlist:
+        return jsonify({'msg':'no bucket list found!!'})
+    db.session.delete(bucketlist)
+    db.session.commit()
+    
+    return jsonify({'msg':'it seems like you have checked one off the list good job'})
 
 
 
